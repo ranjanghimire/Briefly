@@ -5,6 +5,8 @@ export type NormalizedArticle = {
   imageUrl?: string | null;
   publishedAt?: string | null; // ISO string, if provided
   source?: string | null;
+  /** Cleaned full article body used as primary summarization input. */
+  rawContent?: string;
 };
 
 export type FeedArticle = {
@@ -34,6 +36,8 @@ export type ArticleRow = {
   id: string;
   category: string | null;
   topic: string | null;
+  title: string | null;
+  raw_content: string | null;
   short_summary: string | null;
   long_summary: string | null;
   source: string | null;

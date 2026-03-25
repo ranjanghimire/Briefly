@@ -54,3 +54,17 @@ export function articleIdFromScopeAndUrl(params: {
   return uuidv5(`${scope}:${params.url}`, ARTICLE_ID_NAMESPACE);
 }
 
+/** Prefer stored headline; for legacy rows fall back to first line of summary. */
+export function feedArticleDisplayTitle(
+  storedTitle: string | null | undefined,
+  shortSummary: string
+): string | null {
+  const t = storedTitle?.trim();
+  if (t) return t;
+  const line = shortSummary
+    .split("\n")
+    .map((s) => s.trim())
+    .find(Boolean);
+  return line || null;
+}
+

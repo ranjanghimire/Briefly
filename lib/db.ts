@@ -11,6 +11,8 @@ export async function getCoreArticles(params: {
       id,
       category,
       topic,
+      title,
+      raw_content,
       short_summary,
       long_summary,
       source,
@@ -37,6 +39,8 @@ export async function getCustomTopicArticles(params: {
       id,
       category,
       topic,
+      title,
+      raw_content,
       short_summary,
       long_summary,
       source,
@@ -113,6 +117,8 @@ export async function upsertArticles(params: {
     id: string;
     category: string | null;
     topic: string | null;
+    title: string | null;
+    raw_content: string | null;
     short_summary: string;
     long_summary: string;
     source: string | null;
@@ -129,6 +135,8 @@ export async function upsertArticles(params: {
           id,
           category,
           topic,
+          title,
+          raw_content,
           short_summary,
           long_summary,
           source,
@@ -141,6 +149,8 @@ export async function upsertArticles(params: {
           ${a.id},
           ${a.category},
           ${a.topic},
+          ${a.title},
+          ${a.raw_content},
           ${a.short_summary},
           ${a.long_summary},
           ${a.source},
@@ -152,6 +162,8 @@ export async function upsertArticles(params: {
         ON CONFLICT (id) DO UPDATE SET
           category = EXCLUDED.category,
           topic = EXCLUDED.topic,
+          title = EXCLUDED.title,
+          raw_content = EXCLUDED.raw_content,
           short_summary = EXCLUDED.short_summary,
           long_summary = EXCLUDED.long_summary,
           source = EXCLUDED.source,

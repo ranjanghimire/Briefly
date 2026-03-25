@@ -2,6 +2,23 @@ import axios from "axios";
 import type { NormalizedArticle } from "./types";
 import { getRequiredEnv, parseJsonEnv } from "./utils";
 
+/** News search strings tuned per core slug (avoids vague one-word queries like "world"). */
+export const CORE_CATEGORY_SEARCH_QUERIES: Record<string, string> = {
+  top: "breaking news today top national international headlines",
+  world:
+    "international news world politics diplomacy conflicts global affairs United Nations",
+  business: "business news economy stock market companies finance",
+  technology: "technology news tech industry software artificial intelligence",
+  health: "health news medical research healthcare public health",
+  sports: "sports news scores games leagues",
+  entertainment: "entertainment news movies television music celebrities",
+  science: "science news space research climate discovery"
+};
+
+export function searchQueryForCoreCategory(category: string): string {
+  return CORE_CATEGORY_SEARCH_QUERIES[category] ?? category;
+}
+
 type NewsApiKeys = {
   bing?: {
     subscriptionKey: string;
@@ -139,8 +156,7 @@ export async function fetchNewsForCoreCategory(params: {
   limit?: number;
 }): Promise<NormalizedArticle[]> {
   const { category, limit = 10 } = params;
-  // For core categories, use category name as the search query.
-  const query = category;
+  const query = searchQueryForCoreCategory(category);
 
   try {
     const bingArticles = await fetchFromBing(query, limit);

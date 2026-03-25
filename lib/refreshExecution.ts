@@ -1,5 +1,7 @@
+import { fetchArticlePlainText } from "./articleContent";
 import { fetchNewsForCoreCategory, fetchNewsForCustomTopic } from "./fetcher";
 import { summarizeArticle } from "./summarizer";
+import type { NormalizedArticle } from "./types";
 import {
   setCachedSummaryPair,
   setCoreLastRefresh,
@@ -19,6 +21,30 @@ import { articleIdFromScopeAndUrl, nowMs, topicIdFromName } from "./utils";
 
 const CORE_ARTICLE_LIMIT = 10;
 const TOPIC_ARTICLE_LIMIT = 10;
+const RAW_CONTENT_STORE_MAX = 500_000;
+
+function rawContentForStorage(plain: string): string {
+  if (plain.length <= RAW_CONTENT_STORE_MAX) return plain;
+  return plain.slice(0, RAW_CONTENT_STORE_MAX);
+}
+
+async function articleWithFetchedBody(
+  a: NormalizedArticle
+): Promise<NormalizedArticle> {
+  const fromUrl = await fetchArticlePlainText(a.url);
+  const fallback = [a.title, a.description].filter(Boolean).join("\n\n").trim();
+
+  let plain = "";
+  if (fromUrl && fromUrl.length >= 120) {
+    plain = fromUrl;
+  } else if (fallback.length >= 40) {
+    plain = fallback;
+  } else {
+    plain = (fromUrl ?? "").trim() || fallback;
+  }
+
+  return { ...a, rawContent: plain };
+}
 
 export async function executeCoreRefresh(category: string): Promise<void> {
   const now = nowMs();
@@ -30,19 +56,23 @@ export async function executeCoreRefresh(category: string): Promise<void> {
 
     const articlesToUpsert = [];
     for (const a of fetched) {
+      const enriched = await articleWithFetchedBody(a);
       const { short_summary, long_summary } = await summarizeArticle({
-        article: a
+        article: enriched
       });
       const id = articleIdFromScopeAndUrl({
         scopeType: "core",
         scopeName: category,
         url: a.url
       });
+      const body = enriched.rawContent ?? "";
 
       articlesToUpsert.push({
         id,
         category,
         topic: null,
+        title: a.title?.trim() ? a.title.trim() : null,
+        raw_content: body ? rawContentForStorage(body) : null,
         short_summary,
         long_summary,
         source: a.source ?? null,
@@ -106,6 +136,7 @@ export async function executeTopicRefresh(topic: string): Promise<void> {
 
     const articlesToUpsert = [];
     for (const a of fetched) {
+      const enriched = await articleWithFetchedBody(a);
       const id = articleIdFromScopeAndUrl({
         scopeType: "custom",
         scopeName: topic,
@@ -113,13 +144,16 @@ export async function executeTopicRefresh(topic: string): Promise<void> {
       });
 
       const { short_summary, long_summary } = await summarizeArticle({
-        article: a
+        article: enriched
       });
+      const body = enriched.rawContent ?? "";
 
       articlesToUpsert.push({
         id,
         category: null,
         topic,
+        title: a.title?.trim() ? a.title.trim() : null,
+        raw_content: body ? rawContentForStorage(body) : null,
         short_summary,
         long_summary,
         source: a.source ?? null,

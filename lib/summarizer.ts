@@ -13,46 +13,49 @@ type AiModelKeys = {
 function truncate(s: string, maxChars: number): string {
   const v = s ?? "";
   if (v.length <= maxChars) return v;
-  return v.slice(0, maxChars).trimEnd();
+  return `${v.slice(0, maxChars).trimEnd()}…`;
 }
 
-function extractJsonObject(text: string): any | null {
+function extractJsonObject(text: string): Record<string, unknown> | null {
   if (!text) return null;
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return null;
-  const candidate = text.slice(start, end + 1);
+  let t = text.trim();
+  const fenced = /^```(?:json)?\s*([\s\S]*?)```/m.exec(t);
+  if (fenced?.[1]) t = fenced[1].trim();
+
   try {
-    return JSON.parse(candidate);
+    return JSON.parse(t) as Record<string, unknown>;
   } catch {
-    return null;
+    const start = t.indexOf("{");
+    const end = t.lastIndexOf("}");
+    if (start === -1 || end === -1 || end <= start) return null;
+    const candidate = t.slice(start, end + 1);
+    try {
+      return JSON.parse(candidate) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
   }
 }
 
-function heuristicSummaries(article: NormalizedArticle) {
+function buildCorpusForSummary(article: NormalizedArticle): string {
+  const raw = article.rawContent?.trim();
+  if (raw && raw.length >= 80) return raw;
   const title = article.title?.trim() ?? "";
   const desc = article.description?.trim() ?? "";
-  const source = article.source?.trim();
+  return [title, desc].filter(Boolean).join("\n\n").trim();
+}
 
-  const shortLine1 = title ? title : "News article";
-  const shortLine2 = desc ? truncate(desc.replace(/\s+/g, " "), 160) : "Source details unavailable.";
-  const short_summary = source
-    ? `${shortLine1}\n(${source}) ${shortLine2}`
-    : `${shortLine1}\n${shortLine2}`;
+function heuristicSummaries(article: NormalizedArticle) {
+  const corpus = buildCorpusForSummary(article).replace(/\s+/g, " ").trim();
+  const title = article.title?.trim() ?? "";
 
-  const longBase = [
-    title ? `Title: ${title}` : null,
-    desc ? `Description: ${truncate(desc.replace(/\s+/g, " "), 450)}` : null,
-    article.publishedAt ? `Published: ${article.publishedAt}` : null,
-    source ? `Source: ${source}` : null
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const short_summary = corpus
+    ? truncate(corpus, 360)
+    : title || "Summary unavailable for this article.";
 
-  // Approximate 100-150 words using provided description (already factual).
-  const long_summary = longBase
-    ? `In brief: ${longBase}. This summary is based on the article text provided by the news source.`
-    : "In brief: Summary unavailable due to missing article content.";
+  const long_summary = corpus
+    ? truncate(corpus, 1800)
+    : "Summary unavailable — we could not retrieve enough text to summarize.";
 
   return { short_summary, long_summary };
 }
@@ -64,41 +67,54 @@ async function callOpenAiSummarizer(params: {
 }) {
   const client = new OpenAI({ apiKey: params.apiKey });
 
-  const title = params.article.title?.trim() ?? "";
-  const desc = params.article.description?.trim() ?? "";
-  const source = params.article.source?.trim() ?? "";
+  const headline = params.article.title?.trim() ?? "";
+  const articleText = truncate(buildCorpusForSummary(params.article), 14_000);
 
   const prompt = `
-You generate factual, neutral summaries for a mobile news app.
-Use only the information in the provided fields. Do not invent details.
+You are a professional news editor. Read the article below and write copy for a mobile news app.
 
-Return ONLY a valid JSON object with exactly these keys:
-- short_summary: 2-3 lines (plain text), no bullet points
-- long_summary: 1 paragraph (~100-150 words), plain text
+Requirements:
+- Use only facts stated in the article. Do not invent details or speculate.
+- Neutral, factual tone.
+- short_summary must be a concise, 2–3 sentence summary in plain English, focusing only on the core facts and what happened. No fluff, no clickbait, no markdown.
+- long_summary must be 2 short paragraphs (about 120–180 words total) for a detail screen—more context, still factual, no bullet lists.
 
-Article fields:
-- title: ${title}
-- description: ${truncate(desc.replace(/\s+/g, " "), 800)}
-- source: ${source || "unknown"}
+Return ONLY a JSON object with exactly these keys: "short_summary", "long_summary" (both strings).
+
+Headline from the publisher: ${headline || "(none)"}
+
+Article text:
+${articleText}
 `.trim();
 
   const resp = await client.chat.completions.create({
     model: params.model,
-    temperature: 0.2,
+    temperature: 0.25,
+    response_format: { type: "json_object" },
     messages: [{ role: "user", content: prompt }],
-    // Enough tokens for ~100-150 words.
-    max_tokens: 420
+    max_tokens: 720
   });
 
   const content = resp.choices?.[0]?.message?.content ?? "";
-  const parsed = extractJsonObject(content);
-  if (!parsed?.short_summary || !parsed?.long_summary) {
+  const parsed =
+    (() => {
+      try {
+        return JSON.parse(content) as Record<string, unknown>;
+      } catch {
+        return extractJsonObject(content);
+      }
+    })();
+
+  const short_summary =
+    typeof parsed?.short_summary === "string" ? parsed.short_summary.trim() : "";
+  const long_summary =
+    typeof parsed?.long_summary === "string" ? parsed.long_summary.trim() : "";
+
+  if (!short_summary || !long_summary) {
     throw new Error("Model returned invalid summary JSON");
   }
-  return {
-    short_summary: String(parsed.short_summary),
-    long_summary: String(parsed.long_summary)
-  };
+
+  return { short_summary, long_summary };
 }
 
 export async function summarizeArticle(params: { article: NormalizedArticle }) {
@@ -119,8 +135,7 @@ export async function summarizeArticle(params: { article: NormalizedArticle }) {
       article: params.article,
       apiKey
     });
-  } catch (err) {
-    // Fallback to a mid-tier model when the primary fails.
+  } catch {
     try {
       return await callOpenAiSummarizer({
         model: fallbackModel,
@@ -128,9 +143,7 @@ export async function summarizeArticle(params: { article: NormalizedArticle }) {
         apiKey
       });
     } catch {
-      // Final fallback keeps the pipeline functional even if AI is down.
       return heuristicSummaries(params.article);
     }
   }
 }
-
