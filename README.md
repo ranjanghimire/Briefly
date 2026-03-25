@@ -1,4 +1,4 @@
-# Briefly Backend (Vercel Serverless)
+# Briefly (Frontend + Backend)
 
 Lightweight backend for the Briefly mobile news app:
 - Fetches news (Bing primary, fallback provider)
@@ -6,6 +6,11 @@ Lightweight backend for the Briefly mobile news app:
 - Caches summaries and refresh metadata in Vercel KV
 - Stores canonical articles + topics in Vercel Postgres
 - Uses Vercel Cron Jobs to refresh on a schedule
+
+Minimal mobile-first frontend:
+- Next.js App Router + Tailwind
+- Premium-feeling feed cards + long-summary modal
+- Topics + Profile screens with bottom navigation
 
 ## Quick start
 
@@ -36,6 +41,12 @@ Base path is `/api`.
 
 - `NEWS_API_KEYS` is a JSON string (Bing primary, GNews fallback).
 - `AI_MODEL_KEYS` is a JSON string for OpenAI summarization.
+
+## Frontend routes
+
+- `/feed`
+- `/topics`
+- `/profile`
 
 ## Migrations
 
