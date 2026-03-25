@@ -2,7 +2,7 @@
 
 Lightweight backend for the Briefly mobile news app:
 - Fetches news (Bing primary, fallback provider)
-- Generates short + long AI summaries
+- Generates short + long AI summaries 
 - Caches summaries and refresh metadata in Vercel KV
 - Stores canonical articles + topics in Vercel Postgres
 - Uses Vercel Cron Jobs to refresh on a schedule
