@@ -3,6 +3,7 @@ import { getCustomTopicArticles } from "@/lib/db";
 import { getCachedSummaryPair } from "@/lib/cache";
 import { isTopicStale } from "@/lib/feedStale";
 import { triggerInternalRefresh } from "@/lib/internalRefreshTrigger";
+import { executeTopicRefresh } from "@/lib/refreshExecution";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,11 +15,15 @@ export async function GET(
 ) {
   const topic = params.topic;
   const limit = 20;
-  const rows = await getCustomTopicArticles({ topic, limit });
+  let rows = await getCustomTopicArticles({ topic, limit });
 
-  void isTopicStale(topic).then(({ stale }) => {
-    if (stale) triggerInternalRefresh({ topic });
-  });
+  const staleInfo = await isTopicStale(topic);
+  if (rows.length === 0) {
+    await executeTopicRefresh(topic);
+    rows = await getCustomTopicArticles({ topic, limit });
+  } else if (staleInfo.stale) {
+    void triggerInternalRefresh({ topic });
+  }
 
   const cachedPairs = await Promise.all(rows.map((r) => getCachedSummaryPair(r.id)));
 

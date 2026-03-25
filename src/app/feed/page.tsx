@@ -1,13 +1,14 @@
 "use client";
 
-import useSWR from "swr";
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import useSWR, { useSWRConfig } from "swr";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FeedChipBar, type FeedChip } from "@/components/FeedChipBar";
 import { Card, type CardArticle } from "@/components/Card";
 import { LongSummaryModal } from "@/components/LongSummaryModal";
 import { BottomNav } from "@/components/BottomNav";
 import {
+  clickTopic,
   getCoreFeed,
   getCustomFeed,
   getMixedFeed,
@@ -30,8 +31,12 @@ function fetcherForChip(chip: FeedChip) {
   };
 }
 
-export default function FeedPage() {
+function FeedPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const topicFromUrl = searchParams.get("topic");
+  const { mutate: globalMutate } = useSWRConfig();
+
   const [activeChip, setActiveChip] = useState<FeedChip>({
     key: FOR_YOU_KEY,
     kind: "mixed",
@@ -42,6 +47,33 @@ export default function FeedPage() {
     revalidateOnFocus: true,
     dedupingInterval: 10_000
   });
+
+  useEffect(() => {
+    if (!topicsData?.topics) return;
+    const name = topicFromUrl?.trim();
+    if (!name) return;
+
+    const exists = topicsData.topics.some((t) => t.name === name);
+    if (exists) {
+      setActiveChip({
+        key: `topic:${name}`,
+        kind: "topic",
+        label: name,
+        topicName: name
+      });
+    } else {
+      router.replace("/feed", { scroll: false });
+    }
+  }, [topicsData, topicFromUrl, router]);
+
+  const customTopicName =
+    activeChip.kind === "topic" ? activeChip.topicName : null;
+  useEffect(() => {
+    if (!customTopicName) return;
+    void clickTopic(customTopicName)
+      .then(() => globalMutate(TOPICS_SWR_KEY))
+      .catch(() => {});
+  }, [customTopicName, globalMutate]);
 
   const chips = useMemo((): FeedChip[] => {
     const list: FeedChip[] = [
@@ -91,10 +123,14 @@ export default function FeedPage() {
         selectedKey={activeChip.key}
         onSelect={(chip) => {
           if (chip.kind === "topic") {
-            router.push(`/topic/${encodeURIComponent(chip.topicName)}`);
+            setActiveChip(chip);
+            router.replace(`/feed?topic=${encodeURIComponent(chip.topicName)}`, {
+              scroll: false
+            });
             return;
           }
           setActiveChip(chip);
+          router.replace("/feed", { scroll: false });
         }}
       />
 
@@ -155,5 +191,17 @@ export default function FeedPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+export default function FeedPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[color:theme(colors.briefly.bg)] pb-20" />
+      }
+    >
+      <FeedPageInner />
+    </Suspense>
   );
 }
