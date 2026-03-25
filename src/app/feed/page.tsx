@@ -3,6 +3,7 @@
 import useSWR, { useSWRConfig } from "swr";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { FeedChipBar, type FeedChip } from "@/components/FeedChipBar";
 import { Card, type CardArticle } from "@/components/Card";
 import { LongSummaryModal } from "@/components/LongSummaryModal";
@@ -99,7 +100,7 @@ function FeedPageInner() {
     return list;
   }, [topicsData]);
 
-  const { data, error, isLoading, mutate } = useSWR<FeedPayload>(
+  const { data, error, isLoading } = useSWR<FeedPayload>(
     ["feed", activeChip.key],
     fetcherForChip(activeChip),
     {
@@ -135,27 +136,40 @@ function FeedPageInner() {
       />
 
       <main className="mx-auto max-w-md px-4 py-5">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="text-[16px] font-medium text-black">
-            {activeChip.label}
-          </div>
-          <button
-            type="button"
-            onClick={() => mutate()}
-            className="rounded-full bg-[color:theme(colors.briefly.muted)] px-3 py-1.5 text-[12.5px] text-[color:theme(colors.briefly.meta)] hover:text-black"
-          >
-            Refresh
-          </button>
-        </div>
-
         {error ? (
           <div className="rounded-2xl border border-[color:theme(colors.briefly.line)] bg-white p-5 text-[14px] text-[color:theme(colors.briefly.meta)]">
             Couldn&apos;t load the feed right now.
           </div>
         ) : null}
 
-        {isLoading ? (
+        {isLoading && activeChip.kind === "topic" ? (
+          <div
+            className="rounded-2xl border border-[color:theme(colors.briefly.line)] bg-white p-8 text-center shadow-card"
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2
+              className="mx-auto h-10 w-10 animate-spin text-[color:theme(colors.briefly.meta)]"
+              aria-hidden
+            />
+            <p className="mt-5 text-[15px] font-medium text-black">
+              Gathering news for {activeChip.label}
+            </p>
+            <p className="mt-2 text-[13px] leading-relaxed text-[color:theme(colors.briefly.meta)]">
+              We&apos;re fetching and summarizing articles. The first load can take
+              a little while—hang tight.
+            </p>
+          </div>
+        ) : isLoading ? (
           <div className="space-y-4">
+            <div
+              className="flex items-center justify-center gap-2 py-3 text-[13px] text-[color:theme(colors.briefly.meta)]"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+              Loading stories…
+            </div>
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
