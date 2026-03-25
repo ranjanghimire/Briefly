@@ -29,11 +29,12 @@ Feeds call `POST /api/internal/refresh` (fire-and-forget) when KV says content i
 Base path is `/api`.
 
 1. `GET /api/categories`
-2. `GET /api/feed/core/[category]`
-3. `GET /api/feed/custom/[topic]`
-4. `GET /api/feed/mixed`
-5. `POST /api/topic/[topic]/click`
-6. `POST /api/internal/refresh` (JSON body: `{ "category": "world" }` **or** `{ "topic": "Ai" }`, not both)
+2. `GET /api/topics` (core list + DB topics with `demand_score`, `last_refreshed`; `DELETE ?name=` removes topic + its articles)
+3. `GET /api/feed/core/[category]`
+4. `GET /api/feed/custom/[topic]`
+5. `GET /api/feed/mixed`
+6. `POST /api/topic/[topic]/click`
+7. `POST /api/internal/refresh` (JSON body: `{ "category": "world" }` **or** `{ "topic": "Ai" }`, not both)
 
 ## Notes on configuration
 
@@ -42,7 +43,8 @@ Base path is `/api`.
 
 ## Frontend routes
 
-- `/feed`
+- `/feed` (core + custom topic chips; custom opens `/topic/[name]`)
+- `/topic/[topicName]` (custom topic feed tap + demand)
 - `/topics`
 - `/profile`
 

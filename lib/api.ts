@@ -1,4 +1,7 @@
-import type { ClientFeedResponse } from "./clientTypes";
+import type { ClientFeedResponse, TopicsApiResponse } from "./clientTypes";
+
+/** Shared SWR key for home + Topics revalidation. */
+export const TOPICS_SWR_KEY = "/api/topics";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -35,6 +38,17 @@ export async function clickTopic(topic: string) {
   return fetchJson<{ demandScore: number }>(
     `/api/topic/${encodeURIComponent(topic)}/click`,
     { method: "POST" }
+  );
+}
+
+export async function getTopicsList() {
+  return fetchJson<TopicsApiResponse>(TOPICS_SWR_KEY);
+}
+
+export async function deleteTopicByName(name: string) {
+  return fetchJson<{ ok: boolean }>(
+    `${TOPICS_SWR_KEY}?name=${encodeURIComponent(name)}`,
+    { method: "DELETE" }
   );
 }
 

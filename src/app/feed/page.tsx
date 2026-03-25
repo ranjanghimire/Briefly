@@ -2,36 +2,74 @@
 
 import useSWR from "swr";
 import { useMemo, useState } from "react";
-import {
-  BRIEFLY_CATEGORIES,
-  CategoryBar,
-  type UiCategory
-} from "@/components/CategoryBar";
+import { useRouter } from "next/navigation";
+import { FeedChipBar, type FeedChip } from "@/components/FeedChipBar";
 import { Card, type CardArticle } from "@/components/Card";
 import { LongSummaryModal } from "@/components/LongSummaryModal";
 import { BottomNav } from "@/components/BottomNav";
-import { getCoreFeed, getMixedFeed } from "@/lib/api";
-import type { ClientFeedArticle } from "@/lib/clientTypes";
+import {
+  getCoreFeed,
+  getCustomFeed,
+  getMixedFeed,
+  getTopicsList,
+  TOPICS_SWR_KEY
+} from "@/lib/api";
+import type { ClientFeedArticle, TopicsApiResponse } from "@/lib/clientTypes";
 
 type FeedPayload =
   | { articles: ClientFeedArticle[] }
   | { category: string; articles: ClientFeedArticle[] };
 
-function fetcherForCategory(cat: UiCategory) {
+const FOR_YOU_KEY = "for-you";
+
+function fetcherForChip(chip: FeedChip) {
   return async () => {
-    if (cat.kind === "mixed") return getMixedFeed();
-    return getCoreFeed(cat.coreSlug ?? "top");
+    if (chip.kind === "mixed") return getMixedFeed();
+    if (chip.kind === "core") return getCoreFeed(chip.slug);
+    return getCustomFeed(chip.topicName);
   };
 }
 
 export default function FeedPage() {
-  const [activeCat, setActiveCat] = useState<UiCategory>(
-    BRIEFLY_CATEGORIES[0]
-  );
+  const router = useRouter();
+  const [activeChip, setActiveChip] = useState<FeedChip>({
+    key: FOR_YOU_KEY,
+    kind: "mixed",
+    label: "For You"
+  });
+
+  const { data: topicsData } = useSWR<TopicsApiResponse>(TOPICS_SWR_KEY, getTopicsList, {
+    revalidateOnFocus: true,
+    dedupingInterval: 10_000
+  });
+
+  const chips = useMemo((): FeedChip[] => {
+    const list: FeedChip[] = [
+      { key: FOR_YOU_KEY, kind: "mixed", label: "For You" }
+    ];
+    if (!topicsData?.core?.length) return list;
+    for (const c of topicsData.core) {
+      list.push({
+        key: `core:${c.slug}`,
+        kind: "core",
+        label: c.label,
+        slug: c.slug
+      });
+    }
+    for (const t of topicsData.topics ?? []) {
+      list.push({
+        key: `topic:${t.name}`,
+        kind: "topic",
+        label: t.name,
+        topicName: t.name
+      });
+    }
+    return list;
+  }, [topicsData]);
 
   const { data, error, isLoading, mutate } = useSWR<FeedPayload>(
-    ["feed", activeCat.key],
-    fetcherForCategory(activeCat),
+    ["feed", activeChip.key],
+    fetcherForChip(activeChip),
     {
       revalidateOnFocus: false,
       dedupingInterval: 30_000
@@ -48,19 +86,25 @@ export default function FeedPage() {
 
   return (
     <div className="min-h-screen bg-[color:theme(colors.briefly.bg)] pb-20">
-      <CategoryBar
-        selectedKey={activeCat.key}
-        onSelect={(c) => {
-          setActiveCat(c);
+      <FeedChipBar
+        chips={chips}
+        selectedKey={activeChip.key}
+        onSelect={(chip) => {
+          if (chip.kind === "topic") {
+            router.push(`/topic/${encodeURIComponent(chip.topicName)}`);
+            return;
+          }
+          setActiveChip(chip);
         }}
       />
 
       <main className="mx-auto max-w-md px-4 py-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[16px] font-medium text-black">
-            {activeCat.label}
+            {activeChip.label}
           </div>
           <button
+            type="button"
             onClick={() => mutate()}
             className="rounded-full bg-[color:theme(colors.briefly.muted)] px-3 py-1.5 text-[12.5px] text-[color:theme(colors.briefly.meta)] hover:text-black"
           >
@@ -88,9 +132,9 @@ export default function FeedPage() {
             {items.map((a, idx) => (
               <Card
                 key={idx}
-                article={a as any}
+                article={a as CardArticle}
                 onOpen={() => {
-                  setCurrent(a as any);
+                  setCurrent(a as CardArticle);
                   setOpen(true);
                 }}
               />
@@ -113,4 +157,3 @@ export default function FeedPage() {
     </div>
   );
 }
-

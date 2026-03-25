@@ -1,51 +1,43 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import useSWR, { useSWRConfig } from "swr";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { TopicPill } from "@/components/TopicPill";
 import { AddTopicModal } from "@/components/AddTopicModal";
-import { clickTopic } from "@/lib/api";
-
-const STORAGE_KEY = "briefly:topics";
-
-function loadTopics(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((v) => String(v).trim())
-      .filter(Boolean)
-      .slice(0, 50);
-  } catch {
-    return [];
-  }
-}
-
-function saveTopics(topics: string[]) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(topics));
-}
+import {
+  clickTopic,
+  deleteTopicByName,
+  getTopicsList,
+  TOPICS_SWR_KEY
+} from "@/lib/api";
 
 export default function TopicsPage() {
-  const [topics, setTopics] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [busyTopic, setBusyTopic] = useState<string | null>(null);
+  const { mutate: globalMutate } = useSWRConfig();
 
-  useEffect(() => {
-    setTopics(loadTopics());
-  }, []);
+  const { data, error, isLoading } = useSWR(TOPICS_SWR_KEY, getTopicsList, {
+    revalidateOnFocus: true,
+    dedupingInterval: 10_000
+  });
 
   const sorted = useMemo(() => {
-    return [...topics].sort((a, b) => a.localeCompare(b));
-  }, [topics]);
+    const names = (data?.topics ?? []).map((t) => t.name);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [data?.topics]);
 
   return (
     <div className="min-h-screen bg-white pb-20">
       <header className="mx-auto max-w-md px-4 pt-6">
         <div className="text-[18px] font-medium text-black">Topics</div>
         <div className="mt-1 text-[13px] text-[color:theme(colors.briefly.meta)]">
-          Add a topic you care about. Briefly will learn from what you tap.
+          Add a topic — it appears on the{" "}
+          <Link href="/feed" className="underline underline-offset-2">
+            Feed
+          </Link>
+          . Open it there to boost demand and refresh.
         </div>
       </header>
 
@@ -55,6 +47,7 @@ export default function TopicsPage() {
             Your topics
           </div>
           <button
+            type="button"
             onClick={() => setOpen(true)}
             className="rounded-full bg-[color:theme(colors.briefly.muted)] px-4 py-2 text-[14px] text-black shadow-pill"
           >
@@ -62,33 +55,52 @@ export default function TopicsPage() {
           </button>
         </div>
 
-        {sorted.length === 0 ? (
+        {error ? (
           <div className="rounded-2xl border border-[color:theme(colors.briefly.line)] bg-white p-5 text-[14px] text-[color:theme(colors.briefly.meta)]">
-            No topics yet. Add one to start shaping your “For You” feed.
+            Couldn&apos;t load topics.
           </div>
-        ) : (
+        ) : null}
+
+        {isLoading && !data ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-10 rounded-full bg-[color:theme(colors.briefly.muted)] animate-pulse" />
+            ))}
+          </div>
+        ) : null}
+
+        {!isLoading && sorted.length === 0 ? (
+          <div className="rounded-2xl border border-[color:theme(colors.briefly.line)] bg-white p-5 text-[14px] text-[color:theme(colors.briefly.meta)]">
+            No topics yet. Add one — it will show on the Feed home screen.
+          </div>
+        ) : null}
+
+        {sorted.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {sorted.map((t) => (
               <TopicPill
                 key={t}
                 name={t}
                 onRemove={() => {
-                  const next = topics.filter((x) => x !== t);
-                  setTopics(next);
-                  saveTopics(next);
+                  void (async () => {
+                    try {
+                      await deleteTopicByName(t);
+                      await globalMutate(TOPICS_SWR_KEY);
+                    } catch {
+                      // ignore
+                    }
+                  })();
                 }}
               />
             ))}
           </div>
-        )}
+        ) : null}
 
         <div className="mt-10 rounded-2xl bg-[color:theme(colors.briefly.muted)] p-5">
-          <div className="text-[14px] font-medium text-black">
-            Tip
-          </div>
+          <div className="text-[14px] font-medium text-black">Tip</div>
           <div className="mt-2 text-[13px] leading-relaxed text-[color:theme(colors.briefly.meta)]">
-            When you tap a topic in the app, Briefly boosts its demand score on the backend.
-            That helps decide how often it refreshes.
+            Each time you open a topic from the Feed, Briefly records a tap (+3 demand) and
+            refreshes when stale — so topics stay fresh and show up in For You.
           </div>
         </div>
       </main>
@@ -97,14 +109,10 @@ export default function TopicsPage() {
         open={open}
         onClose={() => setOpen(false)}
         onCreate={async (topic) => {
-          const next = Array.from(new Set([topic, ...topics])).slice(0, 50);
-          setTopics(next);
-          saveTopics(next);
-
-          // Give the topic an initial signal (+3) by recording a click.
           setBusyTopic(topic);
           try {
             await clickTopic(topic);
+            await globalMutate(TOPICS_SWR_KEY);
           } finally {
             setBusyTopic(null);
           }
@@ -125,4 +133,3 @@ export default function TopicsPage() {
     </div>
   );
 }
-

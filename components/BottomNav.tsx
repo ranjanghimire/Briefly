@@ -23,8 +23,12 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[color:var(--briefly-line)] bg-white/80 backdrop-blur">
       <div className="mx-auto flex max-w-md items-center justify-between px-6 py-3">
         {items.map(({ href, label, Icon }) => {
+          const onFeedBranch =
+            pathname === "/feed" || pathname?.startsWith("/topic/");
           const active =
-            pathname === href || (href !== "/feed" && pathname?.startsWith(href));
+            href === "/feed"
+              ? onFeedBranch
+              : pathname === href || pathname?.startsWith(href);
           return (
             <Link
               key={href}
