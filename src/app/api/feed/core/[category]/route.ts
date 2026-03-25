@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { CORE_CATEGORIES } from "@/lib/utils";
 import { getCoreArticles } from "@/lib/db";
 import { getCachedSummaryPair } from "@/lib/cache";
+import { isCoreCategoryStale } from "@/lib/feedStale";
+import { triggerInternalRefresh } from "@/lib/internalRefreshTrigger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +23,10 @@ export async function GET(
 
   const limit = 20;
   const rows = await getCoreArticles({ category, limit });
+
+  void isCoreCategoryStale(category).then((stale) => {
+    if (stale) triggerInternalRefresh({ category });
+  });
 
   const cachedPairs = await Promise.all(
     rows.map((r) => getCachedSummaryPair(r.id))

@@ -5,7 +5,7 @@ Lightweight backend for the Briefly mobile news app:
 - Generates short + long AI summaries 
 - Caches summaries and refresh metadata in Vercel KV
 - Stores canonical articles + topics in Vercel Postgres
-- Uses Vercel Cron Jobs to refresh on a schedule
+- On-demand refresh when feeds are requested (no scheduled cron)
 
 Minimal mobile-first frontend:
 - Next.js App Router + Tailwind
@@ -20,12 +20,9 @@ Minimal mobile-first frontend:
    - Locally (if you have a compatible Postgres URL): `npm run migrate`
    - Otherwise, run `scripts/migrate.ts` against your Vercel Postgres using your preferred workflow.
 
-## Cron jobs (Vercel)
+## Background refresh
 
-Cron schedules are configured in `vercel.json`:
-- Hourly: `/api/cron/refresh-topics`, `/api/cron/refresh-core`
-- Daily: `/api/cron/decay-scores`
-- Weekly: `/api/cron/cleanup`
+Feeds call `POST /api/internal/refresh` (fire-and-forget) when KV says content is stale. Configure optional `INTERNAL_REFRESH_SECRET` (Bearer token) and `BRIEFLY_BASE_URL` for reliable server-side `fetch` on Vercel.
 
 ## REST API
 
@@ -36,6 +33,7 @@ Base path is `/api`.
 3. `GET /api/feed/custom/[topic]`
 4. `GET /api/feed/mixed`
 5. `POST /api/topic/[topic]/click`
+6. `POST /api/internal/refresh` (JSON body: `{ "category": "world" }` **or** `{ "topic": "Ai" }`, not both)
 
 ## Notes on configuration
 

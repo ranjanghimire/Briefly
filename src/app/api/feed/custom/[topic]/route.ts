@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCustomTopicArticles } from "@/lib/db";
 import { getCachedSummaryPair } from "@/lib/cache";
+import { isTopicStale } from "@/lib/feedStale";
+import { triggerInternalRefresh } from "@/lib/internalRefreshTrigger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +15,10 @@ export async function GET(
   const topic = params.topic;
   const limit = 20;
   const rows = await getCustomTopicArticles({ topic, limit });
+
+  void isTopicStale(topic).then(({ stale }) => {
+    if (stale) triggerInternalRefresh({ topic });
+  });
 
   const cachedPairs = await Promise.all(rows.map((r) => getCachedSummaryPair(r.id)));
 

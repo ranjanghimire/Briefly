@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { CORE_CATEGORIES } from "@/lib/utils";
 import { getAllTopics, getCoreArticles, getCustomTopicArticles } from "@/lib/db";
 import { getCachedSummaryPair } from "@/lib/cache";
+import { isCoreCategoryStale, isTopicStale } from "@/lib/feedStale";
+import { triggerInternalRefresh } from "@/lib/internalRefreshTrigger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +15,17 @@ export async function GET() {
 
   const topics = await getAllTopics();
   const topCustomTopics = topics.slice(0, 3).map((t) => t.name);
+
+  for (const c of coreSources) {
+    void isCoreCategoryStale(c).then((stale) => {
+      if (stale) triggerInternalRefresh({ category: c });
+    });
+  }
+  for (const t of topCustomTopics) {
+    void isTopicStale(t).then(({ stale }) => {
+      if (stale) triggerInternalRefresh({ topic: t });
+    });
+  }
 
   const corePromises = coreSources.map((c) =>
     getCoreArticles({ category: c, limit: limitPerSource })
