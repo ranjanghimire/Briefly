@@ -2,16 +2,16 @@
 
 import useSWR, { useSWRConfig } from "swr";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { TopicPill } from "@/components/TopicPill";
 import { AddTopicModal } from "@/components/AddTopicModal";
+import { clickTopic, getTopicsList, TOPICS_SWR_KEY } from "@/lib/api";
 import {
-  clickTopic,
-  deleteTopicByName,
-  getTopicsList,
-  TOPICS_SWR_KEY
-} from "@/lib/api";
+  addUserTopic,
+  removeUserTopic,
+  useUserTopics
+} from "@/lib/brieflyUserTopics";
 
 export default function TopicsPage() {
   const [open, setOpen] = useState(false);
@@ -23,21 +23,18 @@ export default function TopicsPage() {
     dedupingInterval: 10_000
   });
 
-  const sorted = useMemo(() => {
-    const names = (data?.topics ?? []).map((t) => t.name);
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [data?.topics]);
+  const userTopics = useUserTopics();
 
   return (
     <div className="min-h-screen bg-white pb-20">
       <header className="mx-auto max-w-md px-4 pt-6">
         <div className="text-[18px] font-medium text-black">Topics</div>
         <div className="mt-1 text-[13px] text-[color:theme(colors.briefly.meta)]">
-          Add a topic — it appears on the{" "}
+          Add a topic — it appears on your{" "}
           <Link href="/feed" className="underline underline-offset-2">
             Feed
-          </Link>
-          . Open it there to boost demand and refresh.
+          </Link>{" "}
+          only for this device. Open it there to boost demand and refresh.
         </div>
       </header>
 
@@ -69,27 +66,21 @@ export default function TopicsPage() {
           </div>
         ) : null}
 
-        {!isLoading && sorted.length === 0 ? (
+        {!isLoading && userTopics.length === 0 ? (
           <div className="rounded-2xl border border-[color:theme(colors.briefly.line)] bg-white p-5 text-[14px] text-[color:theme(colors.briefly.meta)]">
-            No topics yet. Add one — it will show on the Feed home screen.
+            No topics yet. Add one — it will show on your Feed.
           </div>
         ) : null}
 
-        {sorted.length > 0 ? (
+        {userTopics.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {sorted.map((t) => (
+            {userTopics.map((t) => (
               <TopicPill
                 key={t}
                 name={t}
                 onRemove={() => {
-                  void (async () => {
-                    try {
-                      await deleteTopicByName(t);
-                      await globalMutate(TOPICS_SWR_KEY);
-                    } catch {
-                      // ignore
-                    }
-                  })();
+                  removeUserTopic(t);
+                  void globalMutate(TOPICS_SWR_KEY);
                 }}
               />
             ))}
@@ -112,6 +103,7 @@ export default function TopicsPage() {
           setBusyTopic(topic);
           try {
             await clickTopic(topic);
+            addUserTopic(topic);
             await globalMutate(TOPICS_SWR_KEY);
           } finally {
             setBusyTopic(null);

@@ -17,6 +17,7 @@ import {
   TOPICS_SWR_KEY
 } from "@/lib/api";
 import type { ClientFeedArticle, TopicsApiResponse } from "@/lib/clientTypes";
+import { useUserTopics } from "@/lib/brieflyUserTopics";
 
 type FeedPayload =
   | { articles: ClientFeedArticle[] }
@@ -37,6 +38,7 @@ function FeedPageInner() {
   const searchParams = useSearchParams();
   const topicFromUrl = searchParams.get("topic");
   const { mutate: globalMutate } = useSWRConfig();
+  const userTopics = useUserTopics();
 
   const [activeChip, setActiveChip] = useState<FeedChip>({
     key: FOR_YOU_KEY,
@@ -49,13 +51,15 @@ function FeedPageInner() {
     dedupingInterval: 10_000
   });
 
+  const userTopicSet = useMemo(() => new Set(userTopics), [userTopics]);
+
   useEffect(() => {
     if (!topicsData?.topics) return;
     const name = topicFromUrl?.trim();
     if (!name) return;
 
-    const exists = topicsData.topics.some((t) => t.name === name);
-    if (exists) {
+    const existsGlobal = topicsData.topics.some((t) => t.name === name);
+    if (existsGlobal && userTopicSet.has(name)) {
       setActiveChip({
         key: `topic:${name}`,
         kind: "topic",
@@ -65,7 +69,18 @@ function FeedPageInner() {
     } else {
       router.replace("/feed", { scroll: false });
     }
-  }, [topicsData, topicFromUrl, router]);
+  }, [topicsData, topicFromUrl, userTopicSet, router]);
+
+  useEffect(() => {
+    if (activeChip.kind !== "topic") return;
+    if (userTopicSet.has(activeChip.topicName)) return;
+    setActiveChip({
+      key: FOR_YOU_KEY,
+      kind: "mixed",
+      label: "For You"
+    });
+    router.replace("/feed", { scroll: false });
+  }, [activeChip, userTopicSet, router]);
 
   const customTopicName =
     activeChip.kind === "topic" ? activeChip.topicName : null;
@@ -90,6 +105,7 @@ function FeedPageInner() {
       });
     }
     for (const t of topicsData.topics ?? []) {
+      if (!userTopicSet.has(t.name)) continue;
       list.push({
         key: `topic:${t.name}`,
         kind: "topic",
@@ -98,7 +114,7 @@ function FeedPageInner() {
       });
     }
     return list;
-  }, [topicsData]);
+  }, [topicsData, userTopicSet]);
 
   const { data, error, isLoading } = useSWR<FeedPayload>(
     ["feed", activeChip.key],
