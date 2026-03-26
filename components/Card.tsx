@@ -50,21 +50,10 @@ export function Card(props: {
       <div className="rounded-card bg-white shadow-card">
         <div className="flex gap-3 p-5">
           <div className="min-w-0 flex-1">
-            {article.metadata.title ? (
-              <div className="text-[15px] font-semibold leading-snug text-black">
-                {article.metadata.title}
-              </div>
-            ) : null}
-            <div
-              className={[
-                "leading-snug text-black",
-                article.metadata.title
-                  ? "mt-2 text-[14px] text-[color:theme(colors.briefly.secondary)]"
-                  : "text-[16.5px]"
-              ].join(" ")}
-            >
+            <div className="text-[16px] leading-snug text-black">
               {article.short_summary}
             </div>
+
             <div className="mt-3 text-[12.5px] text-[color:theme(colors.briefly.meta)]">
               <span className="truncate">{source}</span>
               {ts ? <span className="mx-2">·</span> : null}

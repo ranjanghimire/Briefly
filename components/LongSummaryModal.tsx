@@ -30,16 +30,10 @@ export function LongSummaryModal(props: {
             exit={{ scale: 0.98, y: 8, opacity: 0 }}
             transition={{ type: "spring", stiffness: 420, damping: 34 }}
           >
-            {props.title ? (
-              <div className="text-[15px] font-medium text-black">
-                {props.title}
-              </div>
-            ) : null}
-            <div className={props.title ? "mt-3" : ""}>
-              <div className="text-[15.5px] leading-relaxed text-[color:theme(colors.briefly.secondary)]">
-                {props.long_summary}
-              </div>
+            <div className="text-[15.5px] leading-relaxed text-[color:theme(colors.briefly.secondary)]">
+              {props.long_summary}
             </div>
+
 
             <div className="mt-6 flex items-end justify-between gap-4">
               <div className="text-[12.5px] text-[color:theme(colors.briefly.meta)]">
