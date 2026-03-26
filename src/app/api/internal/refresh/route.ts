@@ -40,17 +40,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unknown category" }, { status: 400 });
   }
 
-  waitUntil(
-    (async () => {
-      try {
-        if (category) await executeCoreRefresh(category);
-        else await executeTopicRefresh(topic);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error("internal refresh worker error:", err);
-      }
-    })()
-  );
-
-  return NextResponse.json({ accepted: true }, { status: 202 });
+  try {
+    if (category) {
+      await executeCoreRefresh(category);
+    } else {
+      await executeTopicRefresh(topic);
+    }
+  } catch (err) {
+    console.error("internal refresh worker error:", err);
+    return NextResponse.json({ error: "Refresh failed" }, { status: 500 });
+  }
+  
+  return NextResponse.json({ ok: true });
+  
 }
