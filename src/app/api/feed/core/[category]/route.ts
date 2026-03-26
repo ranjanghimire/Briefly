@@ -39,13 +39,13 @@ export async function GET(
       short_summary,
       long_summary: cached?.long_summary ?? r.long_summary ?? "",
       metadata: {
-        title: feedArticleDisplayTitle(r.title, short_summary),
         url: r.url,
         imageUrl: r.image_url,
         publishedAt: r.published_at,
         source: r.source,
         updatedAt: r.updated_at
       }
+      
     };
   });
 
