@@ -20,6 +20,7 @@ export function searchQueryForCoreCategory(category: string): string {
 type NewsApiKeys = {
   bing?: {
     subscriptionKey: string;
+    endpoint: string;   // <-- ADD THIS LINE
     market?: string;
     country?: string;
   };
@@ -29,6 +30,7 @@ type NewsApiKeys = {
     country?: string;
   };
 };
+
 
 function dedupeByUrl(articles: NormalizedArticle[]): NormalizedArticle[] {
   const seen = new Set<string>();
@@ -54,23 +56,26 @@ function parseDateOrNull(v: unknown): string | null {
 async function fetchFromBing(query: string, limit: number) {
   const keys = parseJsonEnv<NewsApiKeys>(getRequiredEnv("NEWS_API_KEYS"), "NEWS_API_KEYS");
   const bing = keys.bing;
-  if (!bing?.subscriptionKey) {
-    throw new Error("Missing NEWS_API_KEYS.bing.subscriptionKey");
+  if (!bing?.subscriptionKey || !bing?.endpoint) {
+    throw new Error("Missing Bing subscriptionKey or endpoint in NEWS_API_KEYS");
   }
 
   try {
-    const resp = await axios.get("https://api.bing.microsoft.com/v7.0/news/search", {
-      headers: {
-        "Ocp-Apim-Subscription-Key": bing.subscriptionKey
-      },
-      params: {
-        q: query,
-        count: limit,
-        mkt: bing.market ?? "en-US",
-        safeSearch: "Strict"
-      },
-      timeout: 15_000
-    });
+    const resp = await axios.get(
+      `${bing.endpoint}/bing/v7.0/news/search`,
+      {
+        headers: {
+          "Ocp-Apim-Subscription-Key": bing.subscriptionKey
+        },
+        params: {
+          q: query,
+          count: limit,
+          mkt: bing.market ?? "en-US",
+          safeSearch: "Strict"
+        },
+        timeout: 15000
+      }
+    );
 
     const value = Array.isArray(resp.data?.value) ? resp.data.value : [];
     const normalized: NormalizedArticle[] = value.map((item: any) => ({
@@ -86,7 +91,7 @@ async function fetchFromBing(query: string, limit: number) {
       source: item?.provider?.[0]?.name ? String(item.provider[0].name) : null
     }));
 
-    return normalized.filter((a) => a.title && a.url);
+    return normalized.filter(a => a.title && a.url);
 
   } catch (err: any) {
     console.error("Bing fetch failed:", {
@@ -98,6 +103,7 @@ async function fetchFromBing(query: string, limit: number) {
     return [];
   }
 }
+
 
 
 /* ------------------------- SECONDARY: GNEWS ------------------------- */
