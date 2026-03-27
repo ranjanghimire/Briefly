@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { executeCoreRefresh } from "@/lib/refreshExecution";
 import { CORE_CATEGORIES } from "@/lib/utils";
 
-export const runtime = "nodejs"; // important
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 
 export async function GET() {
   try {
