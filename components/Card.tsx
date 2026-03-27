@@ -48,24 +48,21 @@ export function Card(props: {
       className="w-full text-left"
     >
       <div className="rounded-card bg-white shadow-card">
-        <div className="flex gap-3 p-4">
+        <div className="flex gap-2 p-4">
           <div className="min-w-0 flex-1">
-          <div className="text-[16px] leading-snug text-black line-clamp-3">
-            {article.short_summary}
-          </div>
+            <div className="text-[15px] leading-snug text-black line-clamp-3">
+              {article.short_summary}
+            </div>
 
-
-            <div className="mt-3 text-[12.5px] text-[color:theme(colors.briefly.meta)]">
+            <div className="mt-2 text-[12px] text-[color:theme(colors.briefly.meta)]">
               <span className="truncate">{source}</span>
-              {ts ? <span className="mx-2">·</span> : null}
+              {ts ? <span className="mx-1">·</span> : null}
               {ts ? <span>{ts}</span> : null}
             </div>
           </div>
 
           {showThumb ? (
-            <div className="h-14 w-14 flex-none overflow-hidden rounded-xl bg-[color:theme(colors.briefly.muted)]">
-              {/* Intentionally subtle: no heavy image styling */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="h-14 w-14 flex-none overflow-hidden rounded-lg bg-[color:theme(colors.briefly.muted)]">
               <img
                 src={article.metadata.imageUrl ?? ""}
                 alt=""
@@ -76,6 +73,7 @@ export function Card(props: {
           ) : null}
         </div>
       </div>
+
     </motion.button>
   );
 }
