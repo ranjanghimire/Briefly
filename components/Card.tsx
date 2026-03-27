@@ -48,11 +48,12 @@ export function Card(props: {
       className="w-full text-left"
     >
       <div className="rounded-card bg-white shadow-card">
-        <div className="flex gap-3 p-5">
+        <div className="flex gap-3 p-4">
           <div className="min-w-0 flex-1">
-            <div className="text-[16px] leading-snug text-black">
-              {article.short_summary}
-            </div>
+          <div className="text-[16px] leading-snug text-black line-clamp-3">
+            {article.short_summary}
+          </div>
+
 
             <div className="mt-3 text-[12.5px] text-[color:theme(colors.briefly.meta)]">
               <span className="truncate">{source}</span>
