@@ -13,7 +13,6 @@ export const CORE_CATEGORY_SEARCH_QUERIES: Record<string, string> = {
   science: "science"
 };
 
-
 export function searchQueryForCoreCategory(category: string): string {
   return CORE_CATEGORY_SEARCH_QUERIES[category] ?? category;
 }
@@ -28,11 +27,6 @@ type NewsApiKeys = {
     apiKey: string;
     lang?: string;
     country?: string;
-  };
-  currents?: {
-    apiKey: string;
-    country?: string;
-    language?: string;
   };
 };
 
@@ -54,6 +48,8 @@ function parseDateOrNull(v: unknown): string | null {
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 }
+
+/* ------------------------- PRIMARY: BING ------------------------- */
 
 async function fetchFromBing(query: string, limit: number) {
   const keys = parseJsonEnv<NewsApiKeys>(getRequiredEnv("NEWS_API_KEYS"), "NEWS_API_KEYS");
@@ -92,10 +88,12 @@ async function fetchFromBing(query: string, limit: number) {
   return normalized.filter((a) => a.title && a.url);
 }
 
+/* ------------------------- SECONDARY: GNEWS ------------------------- */
+
 async function fetchFromGNews(query: string, limit: number) {
   const keys = parseJsonEnv<NewsApiKeys>(getRequiredEnv("NEWS_API_KEYS"), "NEWS_API_KEYS");
   const gnews = keys.gnews;
-  if (!gnews?.apiKey) throw new Error("Missing NEWS_API_KEYS.gnews.apiKey");
+  if (!gnews?.apiKey) return [];
 
   const resp = await axios.get("https://gnews.io/api/v4/search", {
     params: {
@@ -121,34 +119,7 @@ async function fetchFromGNews(query: string, limit: number) {
   return normalized.filter((a) => a.title && a.url);
 }
 
-async function fetchFromCurrents(query: string, limit: number) {
-  const keys = parseJsonEnv<NewsApiKeys>(getRequiredEnv("NEWS_API_KEYS"), "NEWS_API_KEYS");
-  const currents = keys.currents;
-  if (!currents?.apiKey) throw new Error("Missing NEWS_API_KEYS.currents.apiKey");
-
-  const resp = await axios.get("https://api.currentsapi.services/v1/search", {
-    params: {
-      apiKey: currents.apiKey,
-      q: query,
-      language: currents.language ?? "en",
-      country: currents.country ?? "us",
-      pageSize: limit
-    },
-    timeout: 15_000
-  });
-
-  const items = Array.isArray(resp.data?.news) ? resp.data.news : [];
-  const normalized: NormalizedArticle[] = items.map((item: any) => ({
-    title: String(item?.title ?? "").trim(),
-    description: item?.description ? String(item.description) : undefined,
-    url: String(item?.url ?? "").trim(),
-    imageUrl: item?.image ? String(item.image) : null,
-    publishedAt: parseDateOrNull(item?.published_at ?? item?.publishedAt),
-    source: item?.source?.name ? String(item.source.name) : null
-  }));
-
-  return normalized.filter((a) => a.title && a.url);
-}
+/* ------------------------- MAIN FETCH LOGIC ------------------------- */
 
 export async function fetchNewsForCoreCategory(params: {
   category: string;
@@ -157,24 +128,15 @@ export async function fetchNewsForCoreCategory(params: {
   const { category, limit = 10 } = params;
   const query = searchQueryForCoreCategory(category);
 
+  // 1. Try Bing first
   try {
     const bingArticles = await fetchFromBing(query, limit);
     if (bingArticles.length > 0) return dedupeByUrl(bingArticles);
-  } catch (err) {
-    // We'll fall back below.
-  }
+  } catch {}
 
-  const keys = parseJsonEnv<NewsApiKeys>(getRequiredEnv("NEWS_API_KEYS"), "NEWS_API_KEYS");
-  if (keys.gnews) {
-    const gnewsArticles = await fetchFromGNews(query, limit);
-    return dedupeByUrl(gnewsArticles);
-  }
-  if (keys.currents) {
-    const currentArticles = await fetchFromCurrents(query, limit);
-    return dedupeByUrl(currentArticles);
-  }
-
-  throw new Error("No fallback provider configured in NEWS_API_KEYS");
+  // 2. Fallback to GNews
+  const gnewsArticles = await fetchFromGNews(query, limit);
+  return dedupeByUrl(gnewsArticles);
 }
 
 export async function fetchNewsForCustomTopic(params: {
@@ -182,25 +144,14 @@ export async function fetchNewsForCustomTopic(params: {
   limit?: number;
 }): Promise<NormalizedArticle[]> {
   const { topic, limit = 10 } = params;
-  const query = topic;
 
+  // 1. Try Bing
   try {
-    const bingArticles = await fetchFromBing(query, limit);
+    const bingArticles = await fetchFromBing(topic, limit);
     if (bingArticles.length > 0) return dedupeByUrl(bingArticles);
-  } catch (err) {
-    // We'll fall back below.
-  }
+  } catch {}
 
-  const keys = parseJsonEnv<NewsApiKeys>(getRequiredEnv("NEWS_API_KEYS"), "NEWS_API_KEYS");
-  if (keys.gnews) {
-    const gnewsArticles = await fetchFromGNews(query, limit);
-    return dedupeByUrl(gnewsArticles);
-  }
-  if (keys.currents) {
-    const currentArticles = await fetchFromCurrents(query, limit);
-    return dedupeByUrl(currentArticles);
-  }
-
-  throw new Error("No fallback provider configured in NEWS_API_KEYS");
+  // 2. Fallback to GNews
+  const gnewsArticles = await fetchFromGNews(topic, limit);
+  return dedupeByUrl(gnewsArticles);
 }
-
