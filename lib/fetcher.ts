@@ -58,35 +58,47 @@ async function fetchFromBing(query: string, limit: number) {
     throw new Error("Missing NEWS_API_KEYS.bing.subscriptionKey");
   }
 
-  const resp = await axios.get("https://api.bing.microsoft.com/v7.0/news/search", {
-    headers: {
-      "Ocp-Apim-Subscription-Key": bing.subscriptionKey
-    },
-    params: {
-      q: query,
-      count: limit,
-      mkt: bing.market ?? "en-US",
-      safeSearch: "Strict"
-    },
-    timeout: 15_000
-  });
+  try {
+    const resp = await axios.get("https://api.bing.microsoft.com/v7.0/news/search", {
+      headers: {
+        "Ocp-Apim-Subscription-Key": bing.subscriptionKey
+      },
+      params: {
+        q: query,
+        count: limit,
+        mkt: bing.market ?? "en-US",
+        safeSearch: "Strict"
+      },
+      timeout: 15_000
+    });
 
-  const value = Array.isArray(resp.data?.value) ? resp.data.value : [];
-  const normalized: NormalizedArticle[] = value.map((item: any) => ({
-    title: String(item?.name ?? "").trim(),
-    description: item?.description ? String(item.description) : undefined,
-    url: String(item?.url ?? "").trim(),
-    imageUrl: item?.image?.thumbnail?.contentUrl
-      ? String(item.image.thumbnail.contentUrl)
-      : item?.image?.thumbnail?.url
-        ? String(item.image.thumbnail.url)
-        : null,
-    publishedAt: parseDateOrNull(item?.datePublished),
-    source: item?.provider?.[0]?.name ? String(item.provider[0].name) : null
-  }));
+    const value = Array.isArray(resp.data?.value) ? resp.data.value : [];
+    const normalized: NormalizedArticle[] = value.map((item: any) => ({
+      title: String(item?.name ?? "").trim(),
+      description: item?.description ? String(item.description) : undefined,
+      url: String(item?.url ?? "").trim(),
+      imageUrl: item?.image?.thumbnail?.contentUrl
+        ? String(item.image.thumbnail.contentUrl)
+        : item?.image?.thumbnail?.url
+          ? String(item.image.thumbnail.url)
+          : null,
+      publishedAt: parseDateOrNull(item?.datePublished),
+      source: item?.provider?.[0]?.name ? String(item.provider[0].name) : null
+    }));
 
-  return normalized.filter((a) => a.title && a.url);
+    return normalized.filter((a) => a.title && a.url);
+
+  } catch (err: any) {
+    console.error("Bing fetch failed:", {
+      message: err.message,
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      data: err.response?.data
+    });
+    return [];
+  }
 }
+
 
 /* ------------------------- SECONDARY: GNEWS ------------------------- */
 
