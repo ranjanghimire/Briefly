@@ -103,47 +103,45 @@ function cleanAndClipForPrompt(raw: string): string {
 
 export function cleanArticleText(raw: string): string {
   if (!raw) return "";
-  const withoutBlocks = raw
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
-    .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, " ")
-    .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, " ")
-    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, " ")
-    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, " ");
 
-  const textOnly = withoutBlocks
+  // Remove script/style/nav/header/footer blocks
+  let text = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<header[\s\S]*?<\/header>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ");
+
+  // Convert common block tags to newlines
+  text = text
     .replace(/<\/?(p|div|article|section|h[1-6]|li|br)[^>]*>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
 
-  const decoded = decodeBasicEntities(textOnly)
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\r/g, "\n")
-    .replace(/\n{3,}/g, "\n\n");
+  // Decode HTML entities
+  text = decodeBasicEntities(text);
 
-  const lines = decoded
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter((line) => !/https?:\/\//i.test(line))
-    .filter((line) => !looksTimestampOrByline(line))
-    .filter((line) => !hasNoisePhrase(line))
-    .filter((line) => {
-      if (!/[a-z]/i.test(line)) return false;
-      const shortNoisy = line.length < 30 && line.split(/\s+/).length <= 5;
-      return !shortNoisy;
-    });
+  // Normalize whitespace
+  text = text.replace(/\s+/g, " ").trim();
 
-  const paragraphText = lines.join("\n");
-  const sentences = sentenceSplit(paragraphText)
-    .map(normalizeSentence)
-    .filter(Boolean)
-    .filter((s) => s.length >= 35)
-    .filter((s) => !hasNoisePhrase(s))
-    .filter((s) => !looksTimestampOrByline(s));
+  // Remove only *true* boilerplate phrases
+  const blacklist = [
+    "subscribe",
+    "sign in",
+    "newsletter",
+    "advertise",
+    "cookie",
+    "privacy policy",
+    "terms of service"
+  ];
 
-  return sentences.join(" ").replace(/\s+/g, " ").trim();
+  for (const word of blacklist) {
+    const regex = new RegExp(word, "gi");
+    text = text.replace(regex, " ");
+  }
+
+  return text.trim();
 }
+
 
 function extractJsonObject(text: string): Record<string, unknown> | null {
   if (!text) return null;
