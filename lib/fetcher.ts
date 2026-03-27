@@ -4,14 +4,16 @@ import { getRequiredEnv, parseJsonEnv } from "./utils";
 
 /** News search strings tuned per core slug (avoids vague one-word queries like "world"). */
 export const CORE_CATEGORY_SEARCH_QUERIES: Record<string, string> = {
+  top: "breaking news",
   world: "world news",
   business: "business news",
-  technology: "technology",
-  health: "health",
-  sports: "sports",
-  entertainment: "entertainment",
-  science: "science"
+  technology: "technology news",
+  health: "health news",
+  sports: "sports news",
+  entertainment: "entertainment news",
+  science: "science news"
 };
+
 
 export function searchQueryForCoreCategory(category: string): string {
   return CORE_CATEGORY_SEARCH_QUERIES[category] ?? category;
